@@ -1,0 +1,39 @@
+import os
+from google.cloud import storage
+import json
+from app.core.config import settings
+
+def get_storage_client():
+    try:
+        # Requires GOOGLE_APPLICATION_CREDENTIALS in env or default service account
+        return storage.Client()
+    except:
+        return None
+
+async def upload_to_gcs(destination_blob_name: str, file_bytes: bytes):
+    client = get_storage_client()
+    if not client or not settings.GCS_BUCKET_NAME:
+        print(f"[Mock Storage] Saving {destination_blob_name} ({len(file_bytes)} bytes)")
+        return
+        
+    bucket = client.bucket(settings.GCS_BUCKET_NAME)
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_string(file_bytes, content_type="audio/wav")
+
+async def log_interaction(session_id: str, user_id: str, query: str, response: str, user_language: str):
+    """Logs conversation data securely to Cloud Storage JSON blob. This can trigger async Postgres summaries."""
+    log_data = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "user_query": query,
+        "ai_response": response,
+        "detected_language": user_language
+    }
+    client = get_storage_client()
+    if not client or not settings.GCS_BUCKET_NAME:
+        print(f"[Mock Log] {json.dumps(log_data)}")
+        return
+        
+    bucket = client.bucket(settings.GCS_BUCKET_NAME)
+    blob = bucket.blob(f"logs/interactions/{session_id}.json")
+    blob.upload_from_string(json.dumps(log_data), content_type="application/json")

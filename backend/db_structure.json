@@ -1,0 +1,290 @@
+{
+  "card_combos": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer"
+      },
+      {
+        "name": "intensity_score",
+        "type": "integer"
+      },
+      {
+        "name": "rank",
+        "type": "integer"
+      },
+      {
+        "name": "character_card_number",
+        "type": "integer"
+      },
+      {
+        "name": "virtue_karma_card_number",
+        "type": "integer"
+      },
+      {
+        "name": "character_subtitle",
+        "type": "text"
+      },
+      {
+        "name": "combo_type",
+        "type": "text"
+      },
+      {
+        "name": "virtue_category",
+        "type": "text"
+      },
+      {
+        "name": "virtue_karma",
+        "type": "text"
+      },
+      {
+        "name": "card_subtitle",
+        "type": "text"
+      },
+      {
+        "name": "karma_polarity",
+        "type": "text"
+      },
+      {
+        "name": "karma_direction",
+        "type": "text"
+      },
+      {
+        "name": "combo_status",
+        "type": "text"
+      },
+      {
+        "name": "validation_reason",
+        "type": "text"
+      },
+      {
+        "name": "valmiki_reference_anchor",
+        "type": "text"
+      },
+      {
+        "name": "avatar_explain",
+        "type": "text"
+      },
+      {
+        "name": "avatar_followup",
+        "type": "text"
+      },
+      {
+        "name": "mode1_combo_set",
+        "type": "text"
+      },
+      {
+        "name": "app_explanation",
+        "type": "text"
+      },
+      {
+        "name": "final_status",
+        "type": "text"
+      },
+      {
+        "name": "combo_display",
+        "type": "text"
+      },
+      {
+        "name": "avatar_dispute_response",
+        "type": "text"
+      },
+      {
+        "name": "avatar_dispute_witty",
+        "type": "text"
+      },
+      {
+        "name": "gameplay_mode",
+        "type": "text"
+      },
+      {
+        "name": "level_name",
+        "type": "text"
+      },
+      {
+        "name": "kanda",
+        "type": "text"
+      },
+      {
+        "name": "character",
+        "type": "text"
+      }
+    ],
+    "samples": [
+      {
+        "id": 1,
+        "gameplay_mode": "Mode 1",
+        "level_name": "Origin Arc",
+        "kanda": "B?la K???a",
+        "character": "Rama",
+        "character_subtitle": "Ideal King",
+        "combo_type": "Character + Virtue",
+        "virtue_category": "DHARMA",
+        "virtue_karma": "Duty",
+        "card_subtitle": "Core Responsibility",
+        "karma_polarity": null,
+        "karma_direction": null,
+        "combo_status": "Valid",
+        "validation_reason": "Valid because Rama strongly embodies \u201cDuty\u201d in B?la K???a through Obeys elder\u2019s command to protect yaj\u00f1a. Reference: Valmiki Ramayana, Sarga 19\u201322.",
+        "valmiki_reference_anchor": "Valmiki Ramayana, Sarga 19\u201322",
+        "intensity_score": 115,
+        "rank": 17,
+        "mode1_combo_set": "Included (Top 108)",
+        "app_explanation": null,
+        "final_status": "Valid (Active)",
+        "combo_display": "Rama + Duty",
+        "avatar_dispute_response": null,
+        "avatar_dispute_witty": null,
+        "avatar_explain": null,
+        "avatar_followup": null,
+        "character_card_number": 1,
+        "virtue_karma_card_number": 25
+      },
+      {
+        "id": 2,
+        "gameplay_mode": "Mode 1",
+        "level_name": "Origin Arc",
+        "kanda": "B?la K???a",
+        "character": "Rama",
+        "character_subtitle": "Ideal King",
+        "combo_type": "Character + Virtue",
+        "virtue_category": "DHARMA",
+        "virtue_karma": "Righteousness",
+        "card_subtitle": "Moral Compass",
+        "karma_polarity": null,
+        "karma_direction": null,
+        "combo_status": "Valid",
+        "validation_reason": "Valid because Rama strongly embodies \u201cRighteousness\u201d in B?la K???a through Protects sages and ritual order. Reference: Valmiki Ramayana, Sarga 30.",
+        "valmiki_reference_anchor": "Valmiki Ramayana, Sarga 30",
+        "intensity_score": 125,
+        "rank": 8,
+        "mode1_combo_set": "Included (Top 108)",
+        "app_explanation": null,
+        "final_status": "Valid (Active)",
+        "combo_display": "Rama + Righteousness",
+        "avatar_dispute_response": null,
+        "avatar_dispute_witty": null,
+        "avatar_explain": null,
+        "avatar_followup": null,
+        "character_card_number": 1,
+        "virtue_karma_card_number": 26
+      },
+      {
+        "id": 3,
+        "gameplay_mode": "Mode 1",
+        "level_name": "Origin Arc",
+        "kanda": "B?la K???a",
+        "character": "Rama",
+        "character_subtitle": "Ideal King",
+        "combo_type": "Character + Virtue",
+        "virtue_category": "DHARMA",
+        "virtue_karma": "Courage",
+        "card_subtitle": "Heart Courage",
+        "karma_polarity": null,
+        "karma_direction": null,
+        "combo_status": "Valid",
+        "validation_reason": "Valid because Rama strongly embodies \u201cCourage\u201d in B?la K???a through T??ak? elimination; Yaj\u00f1a defense. Reference: Valmiki Ramayana, Sarga 26; Sarga 30.",
+        "valmiki_reference_anchor": "Valmiki Ramayana, Sarga 26; Sarga 30",
+        "intensity_score": 135,
+        "rank": 3,
+        "mode1_combo_set": "Included (Top 108)",
+        "app_explanation": null,
+        "final_status": "Valid (Active)",
+        "combo_display": "Rama + Courage",
+        "avatar_dispute_response": null,
+        "avatar_dispute_witty": null,
+        "avatar_explain": null,
+        "avatar_followup": null,
+        "character_card_number": 1,
+        "virtue_karma_card_number": 29
+      },
+      {
+        "id": 4,
+        "gameplay_mode": "Mode 1",
+        "level_name": "Origin Arc",
+        "kanda": "B?la K???a",
+        "character": "Rama",
+        "character_subtitle": "Ideal King",
+        "combo_type": "Character + Virtue",
+        "virtue_category": "DHARMA",
+        "virtue_karma": "Wisdom",
+        "card_subtitle": "Ancient Insight",
+        "karma_polarity": null,
+        "karma_direction": null,
+        "combo_status": "Valid",
+        "validation_reason": "Valid because Rama's B?la K???a arc (Yaj\u00f1a Protection; T??ak?; Bow of ?iva; Para?ur?ma encounter) aligns directly with the virtue \u201cWisdom\u201d. Reference: Valmiki Ramayana, B?la K???a Sarga 19\u201322 (sent with Vi?v?mitra), Sarga 25\u201326 (T??ak?), Sarga 30 (Yaj\u00f1a protection; Mar?ca/Sub?hu), Sarga 67 (Bow), Sarga 74 (Para?ur?ma).",
+        "valmiki_reference_anchor": "Valmiki Ramayana, B?la K???a Sarga 19\u201322 (sent with Vi?v?mitra), Sarga 25\u201326 (T??ak?), Sarga 30 (Yaj\u00f1a protection; Mar?ca/Sub?hu), Sarga 67 (Bow), Sarga 74 (Para?ur?ma)",
+        "intensity_score": 124,
+        "rank": 10,
+        "mode1_combo_set": "Included (Top 108)",
+        "app_explanation": null,
+        "final_status": "Valid (Active)",
+        "combo_display": "Rama + Wisdom",
+        "avatar_dispute_response": null,
+        "avatar_dispute_witty": null,
+        "avatar_explain": null,
+        "avatar_followup": null,
+        "character_card_number": 1,
+        "virtue_karma_card_number": 30
+      },
+      {
+        "id": 5,
+        "gameplay_mode": "Mode 1",
+        "level_name": "Origin Arc",
+        "kanda": "B?la K???a",
+        "character": "Rama",
+        "character_subtitle": "Ideal King",
+        "combo_type": "Character + Virtue",
+        "virtue_category": "DHARMA",
+        "virtue_karma": "Integrity",
+        "card_subtitle": "Inner Alignment",
+        "karma_polarity": null,
+        "karma_direction": null,
+        "combo_status": "Valid",
+        "validation_reason": "Valid because Rama strongly embodies \u201cIntegrity\u201d in B?la K???a through Acts for dharma, not convenience, throughout missions. Reference: Valmiki Ramayana, Sarga 19\u201322; Sarga 30.",
+        "valmiki_reference_anchor": "Valmiki Ramayana, Sarga 19\u201322; Sarga 30",
+        "intensity_score": 121,
+        "rank": 13,
+        "mode1_combo_set": "Included (Top 108)",
+        "app_explanation": null,
+        "final_status": "Valid (Active)",
+        "combo_display": "Rama + Integrity",
+        "avatar_dispute_response": null,
+        "avatar_dispute_witty": null,
+        "avatar_explain": null,
+        "avatar_followup": null,
+        "character_card_number": 1,
+        "virtue_karma_card_number": 33
+      }
+    ]
+  },
+  "users": {
+    "columns": [
+      {
+        "name": "created_at",
+        "type": "timestamp without time zone"
+      },
+      {
+        "name": "firebase_id",
+        "type": "text"
+      },
+      {
+        "name": "display_name",
+        "type": "text"
+      },
+      {
+        "name": "email",
+        "type": "text"
+      },
+      {
+        "name": "primary_language",
+        "type": "text"
+      },
+      {
+        "name": "profile_picture",
+        "type": "text"
+      }
+    ],
+    "samples": []
+  }
+}
