@@ -11,6 +11,7 @@ from app.services.text_to_speech import synthesize_speech
 from app.services.storage import upload_to_gcs, log_interaction
 from app.services.user_db import save_user, UserRecord, get_user
 from app.api.dependencies import get_current_user
+from app.services.wake_word import WakeWordDetector
 
 router = APIRouter()
 
@@ -29,44 +30,83 @@ async def fetch_user(firebase_id: str):
     return user
 
 @router.websocket("/ws-audio")
-async def websocket_audio(websocket: WebSocket, gameMode: str = "Mode 1", sessionId: str = "default"):
+async def websocket_audio(websocket: WebSocket):
     """Live streaming endpoint to receive audio chunks and process instantly."""
+    gameMode = websocket.query_params.get("gameMode", "Mode 1")
+    sessionId = websocket.query_params.get("sessionId", "default")
+    # New: Check if we should start listening for wake word immediately
+    initial_listening = websocket.query_params.get("listening", "false").lower() == "true"
+    
     await websocket.accept()
-    print(f"\n[WS] New Connection - Mode: {gameMode}, Session: {sessionId}", flush=True)
+    print(f"\n[WS] New Connection - Mode: {gameMode}, Session: {sessionId}, Init Detection: {initial_listening}", flush=True)
+    
     # Send an initial message to let the client know we are ready
     await websocket.send_text(json.dumps({"status": "Connected", "message": "Established connection to EpicVerse AI."}))
     audio_bytes = bytearray()
+    listening_for_wakeword = initial_listening
+    ww_detector = WakeWordDetector()
     
+    chunks_received = 0
     try:
         while True:
             # We can receive either binary audio chunks or JSON text commands
             message = await websocket.receive()
             
             if message.get("type") == "websocket.disconnect":
-                print(f"[WS] Client disconnected ({sessionId})", flush=True)
                 break
                 
             if "bytes" in message:
-                # print(f"DEBUG: Received audio chunk ({len(message['bytes'])} bytes)")
-                audio_bytes.extend(message["bytes"])
+                chunk = message["bytes"]
+                chunks_received += 1
+                
+                if listening_for_wakeword:
+                    # Instant detection on the stream!
+                    if ww_detector.detect(chunk):
+                        print(f"[WS] Wake Word Detected!", flush=True)
+                        await websocket.send_text(json.dumps({"type": "wakeword_detected"}))
+                        listening_for_wakeword = False # Reset after detection
+                        chunks_received = 0
+                else:
+                    audio_bytes.extend(chunk)
+                    # Occasional log for active turns
+                    if chunks_received % 50 == 0:
+                        print(f"[WS] Receiving Voice Data... ({len(audio_bytes)} bytes accumulated)", flush=True)
+
             elif "text" in message:
-                print(f"[WS] Received text command: {message['text']}", flush=True)
                 data = json.loads(message["text"])
-                if data.get("type") == "end":
-                    # The moment the user stops speaking, we instantly transcribe the accumulated stream!
-                    await websocket.send_text(json.dumps({"status": "Processing", "message": "Transcribing audio..."}))
+                command_type = data.get("type")
+                
+                if command_type == "start_wakeword":
+                    listening_for_wakeword = True
+                    audio_bytes.clear()
+                    chunks_received = 0
+                    print(f"[WS] COMMAND: Start Wake Word Listening", flush=True)
                     
+                elif command_type == "stop_wakeword":
+                    listening_for_wakeword = False
+                    print(f"[WS] COMMAND: Stop Wake Word Listening", flush=True)
+
+                elif command_type == "end":
+                    print(f"[WS] Processing turn - Audio buffer size: {len(audio_bytes)} bytes", flush=True)
+                    if len(audio_bytes) < 500: # Less than ~15ms of audio
+                        print(f"[WS] Audio too short, skipping.", flush=True)
+                        audio_bytes.clear()
+                        continue
+
                     stt_result = await transcribe_audio(bytes(audio_bytes))
                     recognized_text = stt_result.get("text")
                     user_lang = stt_result.get("language")
                     
-                    if not recognized_text:
+                    # Clear early to prevent issues if processing fails later
+                    audio_bytes.clear()
+
+                    if not recognized_text or len(recognized_text.strip()) == 0:
                         print(f"[WS] STT Failed - No text recognized", flush=True)
-                        await websocket.send_text(json.dumps({"status": "Error", "message": "Could not recognize speech."}))
-                        break
-                        
-                    await websocket.send_text(json.dumps({"transcript": recognized_text, "status": "Processing", "message": "Generating AI response live..."}))
+                        await websocket.send_text(json.dumps({"status": "Error", "message": "Could not recognize speech. Please try again."}))
+                        continue
                     
+                    print(f"[WS] Recognized: \"{recognized_text}\" (Lang: {user_lang})", flush=True)
+                        
                     # Run the newly optimized 1-shot AI pipeline with Session ID
                     ai_result = await run_ai_pipeline(recognized_text, game_mode=gameMode, session_id=sessionId)
                     final_text = ai_result.get("final_response")
@@ -79,10 +119,15 @@ async def websocket_audio(websocket: WebSocket, gameMode: str = "Mode 1", sessio
                     # Feed binary audio bytes cleanly right back down the websocket!
                     await websocket.send_bytes(output_audio_bytes)
                     
-                    # Reset audio buffer after processing one turn
-                    audio_bytes.clear()
-                    # We don't break here so the user can continue typing or speaking in the same session
+                    # Feed binary audio bytes cleanly right back down the websocket!
+                    await websocket.send_bytes(output_audio_bytes)
                     
+                    # AUTO-RESUME Wake Word detection for the next turn!
+                    listening_for_wakeword = True
+                    audio_bytes.clear()
+                    chunks_received = 0
+                    print(f"[WS] Turn complete. Automatically resumed Wake Word detection.", flush=True)
+
                 elif data.get("type") == "text_query":
                     query_text = data.get("text")
                     print(f"[WS] Querying AI: {query_text}", flush=True)
@@ -99,6 +144,7 @@ async def websocket_audio(websocket: WebSocket, gameMode: str = "Mode 1", sessio
                     output_audio_bytes = await synthesize_speech(final_text, language_code=detected_lang)
                     await websocket.send_bytes(output_audio_bytes)
     except WebSocketDisconnect:
+        pass
         pass
     except Exception as e:
         import traceback

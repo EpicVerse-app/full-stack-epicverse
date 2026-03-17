@@ -7,13 +7,11 @@ load_dotenv()
 
 async def run():
     conn = await asyncpg.connect(os.getenv('DATABASE_URL'))
-    rows = await conn.fetch('SELECT * FROM card_combos LIMIT 1')
-    if rows:
-        cols = list(rows[0].keys())
-        for col in cols:
-            print(col)
-    else:
-        print("No rows found in card_combos")
+    try:
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        print("pgvector enabled successfully.")
+    except Exception as e:
+        print(f"Failed to enable pgvector: {e}")
     await conn.close()
 
 if __name__ == "__main__":

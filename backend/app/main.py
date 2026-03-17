@@ -21,8 +21,16 @@ except Exception as e:
 async def lifespan(app: FastAPI):
     """Runs on server startup: preloads all Excel game mode files into RAM."""
     print("Server starting up - loading game mode data from Excel files...")
+    from app.services.retriever import init_db_pool
+    await init_db_pool()
+    
     await init_db()
     await load_excel_data()
+    
+    print("Pre-loading Wake Word models...")
+    from app.services.wake_word import WakeWordDetector
+    WakeWordDetector() # Initialize singleton
+    
     print("All game mode data loaded and ready!")
     yield
     print("Server shutting down.")

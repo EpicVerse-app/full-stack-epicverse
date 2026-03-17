@@ -1,7 +1,7 @@
 import openai
 import json
 from app.core.config import settings
-from app.services.retriever import query_postgres_database
+from app.services.retriever import query_postgres_database, semantic_search_database
 
 client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -55,24 +55,33 @@ Examples: "Is 1 and 29 a combo?", "Why is 1 and 29 valid?"
 ---
 
 PROCESSING RULES
-
-1. Extract the two numbers from the user's question, OR refer to numbers discussed previously in the conversation context.
+s
+1. Extract two numbers from the user's question. 
+   CRITICAL: You MUST convert all number words into digits. (e.g., "one" -> "1").
 2. Determine which mode the player has selected (Current Mode: {game_mode or 'Mode 1'}).
-3. Query the 'card_combos' table for that mode by calling the 'query_database_for_combo' tool.
-4. IF THE USER ASKS IF A COMBINATION EXISTS (e.g. "is 1 and 29 a combo?", "is it a combo?"): 
-   You must report the EXACT status from the database. Be detailed: e.g., "Combo Status: Valid (Final Status: Valid (Active))" or "Combo Status: Valid (Final Status: Excluded)". 
-   DO NOT simplify. State it exactly as provided in the tool result in the user's language.
-   CRITICAL: DO NOT provide the validation_reason or any explanation at this stage. Keep it to one short sentence.
-5. IF THE USER ASKS WHY OR HOW (e.g. "why?", "how?", "ஏன்?"): 
-   Return ONLY the 'validation_reason' from the database in the exact language the user just used for the question.
-6. If no matching row exists, tell the user in their language that it doesn't exist.
+3. Query the 'card_combos' table for that mode by calling the 'query_database_for_combo' tool ONLY if you have two numbers.
 
-IMPORTANT: You MUST detect the language of the CURRENT user query and respond in that EXACT same language. 
-1. If the current query is in English (e.g., "Why?", "How?"), respond ONLY in English.
-2. If the current query is in Tamil (e.g., "ஏன்?", "எப்படி?"), respond ONLY in Tamil.
-3. If the current query is in Malayalam, respond ONLY in Malayalam. 
-4. If the current query is in French, respond ONLY in French. 
-5. Always TRANSLATE the validation reason from the database into the EXACT language of the latest query.
+4. RESPONSE FORMAT FOR COMBO CHECKS:
+   - IF THE USER ASKS IF A COMBINATION IS VALID (e.g., "1 and 22 combo?"):
+     You MUST only state the status and the numbers with high emotion.
+     YOU MUST NOT EXPLAIN WHY YET.
+     - "Valid": Respond with GREAT HAPPINESS (e.g., "Yes! 1 and 22 is a Valid combo! 🎊").
+     - "Invalid": Respond with SADNESS (e.g., "Oh no, 1 and 5 is Invalid. 😔").
+     Keep it to one very short emotional sentence.
+
+5. RESPONSE FORMAT FOR "WHY" OR "HOW":
+   - IF THE USER ASKS "WHY?", "HOW?", or "EXPLAIN" (in any language like 'Why?', 'ஏன்?', 'എന്തുകൊണ്ട്?'):
+     Provide the full validation reason including 'Validation Reason', 'Reference' (Sarga number), and 'Kanda'.
+     CRITICAL: You MUST translate the reasoning into the user's CURRENT language.
+     Example: "This combo is valid because [Reason]. Reference: [Kanda], [Reference]."
+
+6. LANG DETECTION:
+   Always respond in the EXACT same language the user just used for their last message.
+   (e.g., if user asks 'Why?', respond in English. If user asks 'ஏன்?', respond in Tamil).
+
+RAG (SEMANTIC SEARCH) RULES:
+1. If the user asks a question that is NOT about a specific card combo (e.g., "Tell me a story about Rama"), use the 'semantic_search_database' tool.
+2. Use the retrieved information to provide a rich, narrative answer in the user's language.
 
 CRITICAL: Do not let previous messages in the chat history influence the language of your current response. If the history is in Tamil but the last question is "Why?", you must answer in English.
 NEVER switch languages unless the user switches first."""
@@ -93,6 +102,20 @@ NEVER switch languages unless the user switches first."""
                     "required": ["mode", "character", "karma"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "semantic_search_database",
+                "description": "Performs a RAG-style semantic search on the entire database to find information related to a topic or story.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "The natural language query or topic to search for."}
+                    },
+                    "required": ["query"]
+                }
+            }
         }
     ]
     
@@ -106,7 +129,9 @@ NEVER switch languages unless the user switches first."""
             model=settings.OPENAI_MODEL,
             messages=messages,
             tools=tools,
-            tool_choice="auto"
+            tool_choice="auto",
+            max_tokens=150, # Limit response size for speed
+            temperature=0.7
         )
         
         message = response.choices[0].message
@@ -121,7 +146,6 @@ NEVER switch languages unless the user switches first."""
                 if tool_call.function.name == "query_database_for_combo":
                     args = json.loads(tool_call.function.arguments)
                     llm_selected_mode = args.get('mode', 'Mode 1')
-                    # Force use of the backend-received game_mode to ensure grounding in the selected mode
                     target_mode = game_mode or llm_selected_mode
                     db_result = await query_postgres_database(
                         target_mode, 
@@ -136,23 +160,30 @@ NEVER switch languages unless the user switches first."""
                         "content": str(db_result)
                     }
                     messages.append(tool_msg)
+                elif tool_call.function.name == "semantic_search_database":
+                    args = json.loads(tool_call.function.arguments)
+                    db_result = await semantic_search_database(args.get('query'))
+                    
+                    tool_msg = {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_call.function.name,
+                        "content": str(db_result)
+                    }
+                    messages.append(tool_msg)
             
             # 4. Generate the final response grounded in the DB results and translated
             final_response = await client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
-                messages=messages
+                messages=messages,
+                max_tokens=150
             )
             final_text = final_response.choices[0].message.content or ""
         else:
             final_text = message.content or ""
             
-        # --- TERMINAL LOGGING ---
-        print("\n" + "="*50, flush=True)
-        print(f"USER SELECTED MODE : {game_mode}", flush=True)
-        print(f"QUESTION           : {text}", flush=True)
-        print(f"LLM SELECTED MODE  : {llm_selected_mode}", flush=True)
-        print(f"RESPONSE           : {final_text}", flush=True)
-        print("="*50 + "\n", flush=True)
+        # Minimal console log for status
+        print(f"[AI] Response sent: {final_text[:50]}...", flush=True)
         
         # 5. Cleanly store only text-based history to avoid future tool conflicts
         USER_SESSIONS[session_id].append({"role": "user", "content": text})

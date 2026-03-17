@@ -37,7 +37,7 @@ async def transcribe_audio(audio_content: bytes, project_id: str = settings.GCP_
         response_format="verbose_json"
     )
     
-    # The 'verbose_json' format returns the text and the detected language code natively.
+    print(f"--- STT Result: \"{response.text}\" (Lang: {response.language}) ---", flush=True)
     return {
         "text": response.text,
         "language": response.language

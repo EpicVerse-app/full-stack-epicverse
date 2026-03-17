@@ -9,6 +9,16 @@ load_dotenv()
 client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Global Database Pool
+db_pool = None
+
+async def init_db_pool():
+    """Initializes the global database pool if it doesn't exist."""
+    global db_pool
+    if not db_pool:
+        db_pool = await asyncpg.create_pool(DATABASE_URL)
+    return db_pool
+
 # Backwards compatibility for main.py list_modes
 KNOWLEDGE_BASE_CACHE = []
 
@@ -18,15 +28,66 @@ async def load_excel_data():
 
 async def get_available_modes():
     """Fetches unique game modes from the PostgreSQL database."""
-    conn = await asyncpg.connect(DATABASE_URL)
+    await init_db_pool()
+    async with db_pool.acquire() as conn:
+        try:
+            rows = await conn.fetch("SELECT DISTINCT gameplay_mode FROM card_combos WHERE gameplay_mode IS NOT NULL")
+            return [row['gameplay_mode'] for row in rows]
+        except Exception as e:
+            print(f"Error fetching modes: {e}")
+            return ["Mode 1", "Mode 2"] # Fallback
+
+async def get_embedding(text: str):
+    """Generates embedding for the given text using OpenAI."""
     try:
-        rows = await conn.fetch("SELECT DISTINCT gameplay_mode FROM card_combos WHERE gameplay_mode IS NOT NULL")
-        return [row['gameplay_mode'] for row in rows]
+        response = await client.embeddings.create(
+            input=[text.replace("\n", " ")],
+            model="text-embedding-3-small"
+        )
+        return response.data[0].embedding
     except Exception as e:
-        print(f"Error fetching modes: {e}")
-        return ["Mode 1", "Mode 2"] # Fallback
-    finally:
-        await conn.close()
+        print(f"Embedding Generation Error: {e}")
+        return None
+
+async def semantic_search_database(query: str, limit: int = 3) -> str:
+    """Performs a vector search on the database to find semantically relevant card combos."""
+    embedding = await get_embedding(query)
+    if not embedding:
+        return "Error generating embedding for search."
+        
+    vec_str = "[" + ",".join(map(str, embedding)) + "]"
+    
+    await init_db_pool()
+    async with db_pool.acquire() as conn:
+        try:
+            # Semantic search using cosine distance (<=> operator in pgvector)
+            # We filter for rows that actually have an embedding
+            sql = '''
+                SELECT gameplay_mode, character, virtue_karma, validation_reason, valmiki_reference_anchor, kanda,
+                       1 - (embedding <=> $1) as similarity
+                FROM card_combos
+                WHERE embedding IS NOT NULL
+                ORDER BY embedding <=> $1
+                LIMIT $2
+            '''
+            rows = await conn.fetch(sql, vec_str, limit)
+            
+            if not rows:
+                return "No semantically similar combos found."
+                
+            results = []
+            for row in rows:
+                results.append(
+                    f"[Similarity: {row['similarity']:.3f}] Mode: {row['gameplay_mode']}, "
+                    f"Combo: {row['character']} + {row['virtue_karma']}\n"
+                    f"Reason: {row['validation_reason']}\n"
+                    f"Ref: {row['kanda']}, {row['valmiki_reference_anchor']}\n"
+                )
+            return "\n---\n".join(results)
+            
+        except Exception as e:
+            print(f"Semantic Search Error: {e}")
+            return f"Error performing semantic search: {str(e)}"
 
 async def query_postgres_database(mode: str, character: str, karma: str) -> str:
     """Queries the live PostgreSQL database for the specified combo in the given mode."""
@@ -44,36 +105,41 @@ async def query_postgres_database(mode: str, character: str, karma: str) -> str:
         else:
             formatted_mode = formatted_mode.title()
     
-    conn = await asyncpg.connect(DATABASE_URL)
-    try:
-        # Search by name OR by card number (Order Independent)
-        query = '''
-            SELECT combo_status, final_status, validation_reason 
-            FROM card_combos 
-            WHERE LOWER(gameplay_mode) = LOWER($1)
-            AND (
-                (
-                    (LOWER(character) = LOWER($2) OR CAST(character_card_number AS TEXT) = $2)
-                    AND (LOWER(virtue_karma) = LOWER($3) OR CAST(virtue_karma_card_number AS TEXT) = $3)
+    await init_db_pool()
+    async with db_pool.acquire() as conn:
+        try:
+            # Search by name OR by card number (Order Independent)
+            query = '''
+                SELECT combo_status, final_status, validation_reason, valmiki_reference_anchor, kanda
+                FROM card_combos 
+                WHERE LOWER(gameplay_mode) = LOWER($1)
+                AND (
+                    (
+                        (LOWER(character) = LOWER($2) OR CAST(character_card_number AS TEXT) = $2)
+                        AND (LOWER(virtue_karma) = LOWER($3) OR CAST(virtue_karma_card_number AS TEXT) = $3)
+                    )
+                    OR
+                    (
+                        (LOWER(character) = LOWER($3) OR CAST(character_card_number AS TEXT) = $3)
+                        AND (LOWER(virtue_karma) = LOWER($2) OR CAST(virtue_karma_card_number AS TEXT) = $2)
+                    )
                 )
-                OR
-                (
-                    (LOWER(character) = LOWER($3) OR CAST(character_card_number AS TEXT) = $3)
-                    AND (LOWER(virtue_karma) = LOWER($2) OR CAST(virtue_karma_card_number AS TEXT) = $2)
-                )
-            )
-        '''
-        
-        row = await conn.fetchrow(query, formatted_mode, character, karma)
-        
-        if row:
-            # We provide both combo status and final status to ensure the AI knows exactly what's in the DB
-            return f"Combo Status: {row['combo_status']} (Final Status: {row['final_status']})\nValidation Reason: {row['validation_reason']}"
-        else:
-            return f"No matching combo found in {formatted_mode} for Character: {character} and Virtue: {karma}."
+            '''
             
-    except Exception as e:
-        print(f"PostgreSQL Query Error: {e}")
-        return f"Error retrieving data from database: {str(e)}"
-    finally:
-        await conn.close()
+            row = await conn.fetchrow(query, formatted_mode, character, karma)
+            
+            if row:
+                # Provide full details including reference anchor and kanda for the AI
+                return (
+                    f"Combo Status: {row['combo_status']} (Final Status: {row['final_status']})\n"
+                    f"Validation Reason: {row['validation_reason']}\n"
+                    f"Reference: {row['valmiki_reference_anchor']}\n"
+                    f"Kanda: {row['kanda']}"
+                )
+            else:
+                return f"No matching combo found in {formatted_mode} for Character: {character} and Virtue: {karma}."
+                
+        except Exception as e:
+            print(f"PostgreSQL Query Error: {e}")
+            return f"Error retrieving data from database: {str(e)}"
+
